@@ -152,158 +152,176 @@
 
   <script type="module">
     // Import Firebase modules
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-auth.js";
-import { getFirestore, collection, addDoc, query, orderBy, limit, getDocs, onSnapshot, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-firestore.js";
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-auth.js";
+    import { getFirestore, collection, addDoc, query, orderBy, limit, getDocs, onSnapshot, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-firestore.js";
 
-// Firebase configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyAMA9G6fRsM8PSSdMRECJ28NFgqVnObG9Y",
-  authDomain: "chat-ca014.firebaseapp.com",
-  projectId: "chat-ca014",
-  storageBucket: "chat-ca014.appspot.com",
-  messagingSenderId: "59445546221",
-  appId: "1:59445546221:web:2054cd4911acd9ff7850e4",
-  measurementId: "G-SR4Z0LBG27"
-};
+    // Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyAMA9G6fRsM8PSSdMRECJ28NFgqVnObG9Y",
+      authDomain: "chat-ca014.firebaseapp.com",
+      projectId: "chat-ca014",
+      storageBucket: "chat-ca014.appspot.com",
+      messagingSenderId: "59445546221",
+      appId: "1:59445546221:web:2054cd4911acd9ff7850e4",
+      measurementId: "G-SR4Z0LBG27"
+    };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
 
-// DOM elements
-const authSection = document.getElementById('auth-section');
-const chatSection = document.getElementById('chat-section');
-const usernameInput = document.getElementById('username');
-const passwordInput = document.getElementById('password');
-const loginButton = document.getElementById('login-button');
-const createAccountButton = document.getElementById('create-account-button');
-const messagesDiv = document.getElementById('messages');
-const messageInput = document.getElementById('message-input');
-const sendButton = document.getElementById('send-button');
+    // Set persistence to local
+    setPersistence(auth, browserLocalPersistence)
+      .then(() => {
+        console.log("Persistence set to local");
+      })
+      .catch((error) => {
+        console.error("Error setting persistence:", error);
+      });
 
-// Show auth section by default
-authSection.style.display = 'flex';
+    // DOM elements
+    const authSection = document.getElementById('auth-section');
+    const chatSection = document.getElementById('chat-section');
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+    const loginButton = document.getElementById('login-button');
+    const createAccountButton = document.getElementById('create-account-button');
+    const messagesDiv = document.getElementById('messages');
+    const messageInput = document.getElementById('message-input');
+    const sendButton = document.getElementById('send-button');
 
-// Login function
-function login() {
-  const username = usernameInput.value;
-  const password = passwordInput.value;
-  signInWithEmailAndPassword(auth, `${username}@example.com`, password)
-    .then(() => {
-      authSection.style.display = 'none';
-      chatSection.style.display = 'flex';
-      loadMessages();
-    })
-    .catch((error) => {
-      alert('Login failed: ' + error.message);
-    });
-}
-
-// Handle login button click
-loginButton.addEventListener('click', login);
-
-// Allow login with Enter key
-usernameInput.addEventListener('keypress', (event) => {
-  if (event.key === 'Enter') {
-    login();
-  }
-});
-passwordInput.addEventListener('keypress', (event) => {
-  if (event.key === 'Enter') {
-    login();
-  }
-});
-
-// Prevent Enter from triggering account creation
-createAccountButton.addEventListener('click', () => {
-  const username = usernameInput.value;
-  const password = passwordInput.value;
-  createUserWithEmailAndPassword(auth, `${username}@example.com`, password)
-    .then(() => {
-      authSection.style.display = 'none';
-      chatSection.style.display = 'flex';
-      loadMessages();
-    })
-    .catch((error) => {
-      alert('Account creation failed: ' + error.message);
-    });
-});
-
-// Send message function
-async function sendMessage() {
-  const message = messageInput.value;
-  const user = auth.currentUser;
-  if (user && message) {
-    await addDoc(collection(db, "messages"), {
-      username: user.email.split('@')[0],
-      message: message,
-      timestamp: new Date()
-    });
-    messageInput.value = '';
-  }
-}
-
-// Handle send button click
-sendButton.addEventListener('click', sendMessage);
-
-// Allow sending messages with Enter key
-messageInput.addEventListener('keypress', (event) => {
-  if (event.key === 'Enter') {
-    sendMessage();
-  }
-});
-
-// Load messages and keep only the most recent 50
-async function loadMessages() {
-  const messagesRef = collection(db, "messages");
-  const q = query(messagesRef, orderBy("timestamp", "desc"), limit(50));
-
-  // Fetch messages
-  const querySnapshot = await getDocs(q);
-  messagesDiv.innerHTML = ''; // Clear existing messages
-
-  const messageDocs = [];
-  querySnapshot.forEach((doc) => {
-    messageDocs.push({ id: doc.id, ...doc.data() });
-  });
-
-  messageDocs.reverse().forEach((data) => addMessageToUI(data));
-
-  // Listen for new messages in real-time
-  onSnapshot(query(messagesRef, orderBy("timestamp")), async (snapshot) => {
-    messagesDiv.innerHTML = ''; // Clear existing messages
-    const allMessages = [];
-    snapshot.forEach((doc) => {
-      allMessages.push({ id: doc.id, ...doc.data() });
+    // Check if user is already logged in
+    auth.onAuthStateChanged((user) => {
+      if (user) {
+        // User is signed in, show chat section
+        authSection.style.display = 'none';
+        chatSection.style.display = 'flex';
+        loadMessages();
+      } else {
+        // No user is signed in, show auth section
+        authSection.style.display = 'flex';
+        chatSection.style.display = 'none';
+      }
     });
 
-    // Delete old messages if more than 50 exist
-    if (allMessages.length > 50) {
-      const messagesToDelete = allMessages.slice(0, allMessages.length - 50);
-      for (const msg of messagesToDelete) {
-        await deleteDoc(doc(db, "messages", msg.id));
+    // Login function
+    function login() {
+      const username = usernameInput.value;
+      const password = passwordInput.value;
+      signInWithEmailAndPassword(auth, `${username}@example.com`, password)
+        .then(() => {
+          authSection.style.display = 'none';
+          chatSection.style.display = 'flex';
+          loadMessages();
+        })
+        .catch((error) => {
+          alert('Login failed: ' + error.message);
+        });
+    }
+
+    // Handle login button click
+    loginButton.addEventListener('click', login);
+
+    // Allow login with Enter key
+    usernameInput.addEventListener('keypress', (event) => {
+      if (event.key === 'Enter') {
+        login();
+      }
+    });
+    passwordInput.addEventListener('keypress', (event) => {
+      if (event.key === 'Enter') {
+        login();
+      }
+    });
+
+    // Prevent Enter from triggering account creation
+    createAccountButton.addEventListener('click', () => {
+      const username = usernameInput.value;
+      const password = passwordInput.value;
+      createUserWithEmailAndPassword(auth, `${username}@example.com`, password)
+        .then(() => {
+          authSection.style.display = 'none';
+          chatSection.style.display = 'flex';
+          loadMessages();
+        })
+        .catch((error) => {
+          alert('Account creation failed: ' + error.message);
+        });
+    });
+
+    // Send message function
+    async function sendMessage() {
+      const message = messageInput.value;
+      const user = auth.currentUser;
+      if (user && message) {
+        await addDoc(collection(db, "messages"), {
+          username: user.email.split('@')[0],
+          message: message,
+          timestamp: new Date()
+        });
+        messageInput.value = '';
       }
     }
 
-    allMessages.slice(-50).forEach((data) => addMessageToUI(data));
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-  });
-}
+    // Handle send button click
+    sendButton.addEventListener('click', sendMessage);
 
-// Add a message to the UI
-function addMessageToUI(data) {
-  const messageElement = document.createElement('div');
-  messageElement.classList.add('message');
-  messageElement.innerHTML = `
-    <div class="username">${data.username}</div>
-    <div class="text">${data.message}</div>
-  `;
-  messagesDiv.appendChild(messageElement);
-}
+    // Allow sending messages with Enter key
+    messageInput.addEventListener('keypress', (event) => {
+      if (event.key === 'Enter') {
+        sendMessage();
+      }
+    });
 
+    // Load messages and keep only the most recent 50
+    async function loadMessages() {
+      const messagesRef = collection(db, "messages");
+      const q = query(messagesRef, orderBy("timestamp", "desc"), limit(50));
 
+      // Fetch messages
+      const querySnapshot = await getDocs(q);
+      messagesDiv.innerHTML = ''; // Clear existing messages
+
+      const messageDocs = [];
+      querySnapshot.forEach((doc) => {
+        messageDocs.push({ id: doc.id, ...doc.data() });
+      });
+
+      messageDocs.reverse().forEach((data) => addMessageToUI(data));
+
+      // Listen for new messages in real-time
+      onSnapshot(query(messagesRef, orderBy("timestamp")), async (snapshot) => {
+        messagesDiv.innerHTML = ''; // Clear existing messages
+        const allMessages = [];
+        snapshot.forEach((doc) => {
+          allMessages.push({ id: doc.id, ...doc.data() });
+        });
+
+        // Delete old messages if more than 50 exist
+        if (allMessages.length > 50) {
+          const messagesToDelete = allMessages.slice(0, allMessages.length - 50);
+          for (const msg of messagesToDelete) {
+            await deleteDoc(doc(db, "messages", msg.id));
+          }
+        }
+
+        allMessages.slice(-50).forEach((data) => addMessageToUI(data));
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      });
+    }
+
+    // Add a message to the UI
+    function addMessageToUI(data) {
+      const messageElement = document.createElement('div');
+      messageElement.classList.add('message');
+      messageElement.innerHTML = `
+        <div class="username">${data.username}</div>
+        <div class="text">${data.message}</div>
+      `;
+      messagesDiv.appendChild(messageElement);
+    }
   </script>
 </body>
 </html>
